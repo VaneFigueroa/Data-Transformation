@@ -1,0 +1,531 @@
+---
+title: "Transformación de datos"
+author: "Vane Figueroa Robles"
+date: "30/3/2022"
+output:
+  
+  
+  html_document: 
+   toc: true
+   toc_float: true
+   theme: "journal"
+  pdf_document: default
+editor_options: 
+  markdown: 
+    wrap: sentence
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, echo=FALSE}
+options(repos = list(CRAN="http://cran.rstudio.com/"))
+```
+
+```{r, include=FALSE}
+##Asignamos directorio de trabajo. 
+setwd("C:/Users/Vane/Documents/R basico")
+```
+
+```{r load-packages, message=FALSE, warning=F, echo=F}
+library(tidyverse)
+```
+
+```{r data, include= FALSE, message = FALSE, warning=F}
+library(nycflights13)
+data("fligths")
+```
+## Transformación
+
+En este proyecto, se desarrolla las actividades propuestas en  [R for Data Science](https://es.r4ds.hadley.nz/index.html) de Hadley Wickham y Garrett Grolemund.  
+
+Se examina las funciones del paquete dplyr para resolver desafios de reducir el volúmen de datos y lograr las datos necesarios para responder a ciertas preguntas.
+
+Para estos ejercicios, los autores proponen  trabajar con datos de los vuelos de los principales aeropuestos de Nueva York de la oficina de Estadística de Transporte de EEUU.
+
+```{r primeras filas, echo=F}
+head(flights)
+```
+
+```{r tipo de variables, echo=T}
+glimpse(flights)
+```
+
+```{r, eval=F}
+??flights
+```
+
+Del libro de códigos *libro de códigos*, se encuentra la descripción de las variables, para aceder escribimos `?nycflights` en la consola.
+
+-   `year`, `month`, `day`: Fecha de salida
+
+-   `dep_time`, `arr_time`: Horas de salida y llegada, zona horaria local
+
+-   `dep_delay`, `arr_delay`: Retrasos de salida y llegada, en minutos.
+    Los tiempos negativos representan salidas/llegadas anticipadas
+
+-   `carrier`: Abreviatura de terminales
+
+    `9E`: Endeavor Air Inc - `AA`: American Airlines Inc - `AS`: Alaska Airlines Inc
+
+    `B6`: JetBlue Airways - `DL`: Delta Air Lines Inc - `EV`: ExpressJet Airlines Inc
+
+    `F9`: Frontier Airlines Inc - `FL`: AirTran Airways Corporation  - `HA`: Hawaiian Airlines
+
+    Inc - `MQ`: Envoy Air - `OO`: SkyWest Airlines Inc - `UA`: United Air Lines Inc - `US`: US
+
+    Airways Inc - `VX`: Virgin America - `WN`: Southwest Airlines Co - `YV`: Mesa Airlines Inc
+
+-   `tailnum`: Número de cola del avión
+
+-   `flight`: Número de vuelo
+
+-   `origin`, `dest`: Códigos de aeropuerto de origen y destino
+
+-   `air_time`: Cantidad de tiempo pasado en el aire, en minutos
+
+-   `distance`: Distancia volada, en millas
+
+-   `hour`, `minute`: Hora de salida dividida en horas y minutos.
+
+-  'time_hour': Fecha y hora programada del vuelo como fecha POSIXct. Junto con el origen, se puede usar para unir datos de vuelos con datos meteorológicos.
+
+## Filtrar filas con filter()
+
+##### 5.2.4 Ejercicios
+
+1. Encuentra todos los vuelos que:
+
+- Tuvieron un retraso de llegada de dos o más horas
+```{r}
+flights %>%
+  filter(arr_delay >= 120)
+```
+
+- Volaron a Houston (IAH o HOU)
+```{r}
+flights %>%
+  filter(dest == "IAH" | dest == "HOU")
+```
+Tambien, se puede usar %in%: 
+```{r}
+flights %>%
+  filter(dest %in% c("IAH","HOU"))
+```
+
+- Fueron operados por United, American o Delta
+```{r}
+flights %>%
+  filter(carrier == "UA" | carrier == "AA"| carrier == "DL")
+```
+
+```{r}
+flights %>%
+  filter(carrier %in% c("UA", "AA", "DL"))
+```
+
+- Partieron en invierno del hemisferio sur (julio, agosto y septiembre)
+```{r}
+flights %>%
+  filter(month == 7 | month == 8 | month == 9)
+```
+
+```{r}
+flights %>%
+  filter(month %in% c(7, 8, 9))
+```
+
+- Llegaron más de dos horas tarde, pero no salieron tarde
+```{r}
+flights %>%
+  filter(arr_delay>120 &  dep_delay <= 0)
+```
+
+- Se retrasaron por lo menos una hora, pero repusieron más de 30 minutos en vuelo
+```{r}
+flights %>%
+  filter(dep_delay>=60 & arr_delay<30)
+```
+
+- Partieron entre la medianoche y las 6 a.m. (incluyente)
+```{r}
+flights %>%
+  filter(hour>=0, hour<=6)
+```
+
+2. Otra función de dplyr que es útil para usar filtros es between(). ¿Qué hace? ¿Puedes usarla para simplificar el código necesario para responder a los desafíos anteriores?
+Es útil para hacer filtros de valores en un vector numérico que caen en el rango especificado. 
+Del apartado anterior, por ejemplo puede hacerse: 
+```{r}
+flights %>%
+  filter(between(hour, 0, 6))
+```
+3. ¿Cuántos vuelos tienen datos faltantes en horario_salida? ¿Qué otras variables tienen valores faltantes? ¿Qué representan estas filas?
+```{r}
+flights %>%
+filter(is.na(dep_time))
+```
+
+```{r}
+sum(is.na(flights$dep_time))
+```
+
+Los vuelos que tienen `NA` en su horario de salida, también lo tienen en el horario de llegada, por lo que se puede inferir que son vuelos que fueron cancelados. 
+
+4. ¿Por qué NA ^ 0 no es faltante? ¿Por qué NA | TRUE no es faltante? ¿Por qué FALSE & NA no es faltante? ¿Puedes descubrir la regla general? (¡NA * 0 es un contraejemplo complicado!)
+
+NA representa un valor desconocido. La función `is.na()` determina si falta un valor y devuelve un valor lógico `TRUE` en los casos en que es NA (Not Available). 
+```{r}
+x <- c(NA)
+is.na(x)
+```
+Si realizamos la operación NA ^ 0, se obtiene como resultado igual a 1, porque cualquier número a la potencia cero es igual a 1.
+```{r}
+x^0
+```
+Si realizamos NA | TRUE, el resultado es TRUE, ya que por lógica proposicional `TRUE` | `TRUE`  y  `FALSE` | `TRUE` es siempre igual a `TRUE`
+```{r}
+x | TRUE
+```
+Si realizamos la operación FALSE & NA,el resultado es TRUE, tal como ocurre en el caso anterior, por lógica proposicional `TRUE`&`FALSE` y `FALSE`&`FALSE` es siempre `FALSE`.
+
+```{r}
+FALSE & x
+```
+NA * 0 es un contraejemplo, no ocurre como en los ejemplos anteriores, aquí el resultado es NA.
+```{r}
+x * 0
+```
+## Reordenar las filas con arrange()
+
+##### 5.3.1 Ejercicios 
+
+1. ¿Cómo podrías usar arrange() para ordenar todos los valores faltantes al comienzo? (Sugerencia: usa is.na()).
+```{r}
+arrange(flights,desc(is.na(dep_time)))
+```
+
+2. Ordena vuelos para encontrar los vuelos más retrasados. 
+```{r}
+arrange(flights, desc(dep_time))
+```
+Encuentra los vuelos que salieron más temprano.
+```{r}
+arrange(flights, dep_time)
+```
+
+3. Ordena vuelos para encontrar los vuelos más rápidos (que viajaron a mayor velocidad).
+```{r}
+arrange(flights,desc(distance/air_time))
+```
+
+4. ¿Cuáles vuelos viajaron más lejos? 
+```{r}
+arrange(flights,desc(distance))
+```
+¿Cuál viajó más cerca?
+arrange ordena los valores en orden creciente por default. 
+```{r}
+arrange(flights, (distance))
+```
+
+## Seleccionar columnas con select()
+
+##### 5.4.1 Ejercicios
+
+1. Haz una lluvia de ideas sobre tantas maneras como sea posible para seleccionar horario_salida, atraso_salida, horario_llegada, y atraso_llegada de vuelos.
+
+Podemos seleccionar las columnas, nombrandolas.
+```{r}
+select(flights, dep_time, dep_delay, arr_time, arr_delay)
+```
+
+Otra forma es seleccionando las variables que empiezan con "horario" y "atraso" con la función `starts_with()` ("empieza con") del paquete __dplyr__:
+
+```{r}
+select(flights, starts_with("dep"), starts_with("arr"))
+```
+
+Otras funciones útiles para la selección de columnas son contains () y ends_with (). En este caso que tenemos varias columnas que contienen las palabras de los nombres de las columnas que necesitamos, no podemos usar contains. Lo mismo ocurre con la función ends_with(), tenemos otras columnas que terminan en Time y delay.  
+```{r}
+select(flights,contains("dep"),contains("arr"))
+```
+
+```{r}
+select(flights, ends_with("time"), ends_with("delay"))
+```
+
+2. ¿Qué sucede si incluyes el nombre de una variable varias veces en una llamada a select()?
+Aunque se incluya más de una vez una variable al utilizar `select()` esta solo se considerará una vez:
+```{r}
+select(flights, dep_time, dep_time, dep_time)
+```
+
+3. ¿Qué hace la función any_of()? ¡¿Por qué podría ser útil en conjunto con este vector?
+vars <- c ("year", "month", "day", "dep_delay", "arr_delay")
+
+```{r}
+vars <- c ("year", "month", "day", "dep_delay", "arr_delay")
+```
+
+La función `any_of()` selecciona todas las variables que están en el vector `vars`:
+```{r}
+select(flights, any_of(vars))
+```
+
+4. ¿Te sorprende el resultado de ejecutar el siguiente código? ¿Cómo tratan por defecto las funciones auxiliares de select() a las palabras en mayúsculas o en minúsculas? ¿Cómo puedes cambiar ese comportamiento predeterminado?
+```{r}
+select(flights, contains("DEP"))
+```
+
+La función `contains()` ("contiene") no distingue entre mayúsculas y minúsculas. Si necesitamos que la función distinga mayúsculas y minúsculasento, debemos agregar el argumento `ignore.case = FALSE` , que por defecto es igual a TRUE. 
+```{r}
+select(flights, contains("DEP", ignore.case = FALSE))
+```
+
+
+## Añadir nuevas variables con mutate()
+
+##### 5.5.2 Ejercicios
+
+1. Las variables horario_salida y salida_programada tienen un formato conveniente para leer, pero es difícil realizar cualquier cálculo con ellas porque no son realmente números continuos. Transfórmalas hacia un formato más conveniente como número de minutos desde la medianoche.
+En el libro de código, se especifica que dep_time, arr_time, sched_delay_time y sched_arr_time están medidas en hora local formato HMM. Es decir, por ejemplo la primera fila dep_time tiene un valor 517, de tal forma que son las 5:17 a.m.  
+
+```{r}
+select(flights, dep_time, arr_time, sched_dep_time, sched_arr_time)
+```
+Para transfórmalas en minutos desde la medianoche, vamos 
+```{r}
+659%/%100 #division entera
+```
+La cantidad de minutos en esas 6 horas:
+```{r}
+659%/%100 *60
+```
+Solo queda sumar los 59 minutos:
+```{r}
+659 %% 100 #resto
+```
+Entonces, el número de minutos transcurridos desde las 00:00 hasta las 6:59 AM son:
+```{r}
+659 %/% 100 * 60 + 659 %% 100 
+```
+Sin embargo, la medianoche toma el valor 24:00 con lo cual el número de minutos desde la medianoche es 1440 en lugar de 0. Para resolver esto usamos nuevamente `%%`.
+```{r}
+2400 %/% 100 *60
+```
+```{r}
+(659 %/% 100 * 60 + 659 %% 100) %% 1440 #mismo resultado anterior
+```
+
+```{r}
+(2400 %/% 100 * 60 + 2400 %% 100) %% 1440 #cero minutos desde la medianoche
+```
+```{r}
+flights %>%
+mutate(sched_dep_min = (sched_dep_time %/% 100 * 60 + sched_dep_time %% 100) %% 1440) %>%
+  mutate(sched_arr_min = (sched_arr_time %/% 100 * 60 + sched_arr_time %% 100) %% 1440) %>%
+  mutate(dep_min = (dep_time %/% 100 * 60 + dep_time %% 100) %% 1440) %>%
+  mutate(arr_min = (arr_time %/% 100 * 60 + arr_time %% 100) %% 1440)
+```
+
+2. Compara tiempo_vuelo con horario_llegada - horario_salida. ¿Qué esperas ver? ¿Qué ves? ¿Qué necesitas hacer para arreglarlo?
+```{r}
+flights %>%
+  mutate(diference_dep_arr = arr_time - dep_time)
+```
+
+
+3. Compara horario_salida, salida_programada, y atraso_salida. ¿Cómo esperarías que esos tres números estén relacionados? El horario_salida (dep_time) podría obtenerse mediante la suma de las columnas de salida programada (sched_dep_time) y el atraso en la salida (dep_delay). 
+```{r}
+mutate(flights, dep_time_formula = sched_dep_time + dep_delay)
+```
+
+4. Encuentra los 10 vuelos más retrasados utilizando una función de ordenamiento. ¿Cómo quieres manejar los empates? Lee atentamente la documentación de min_rank().
+Para romper empates en los valores de la columna dep_delay (atraso en la salida), coniderar arr_delay (atraso en la llegada). 
+```{r}
+flights %>%
+  arrange((min_rank(desc(dep_delay))), desc(arr_delay))
+
+```
+
+5. ¿Qué devuelve 1:3 + 1:10? ¿Por qué?
+Arroja la advertencia que la longitud de la secuencia más larga no es un múltiplo de la longitud del objeto más corto. 
+```{r}
+1:3 + 1:10
+```
+
+
+6. ¿Qué funciones trigonométricas proporciona R?
+Seno, coseno , tangente y cotangente
+
+## Resumenes agrupados con summarise()
+
+##### 5.6.7 Ejercicios
+
+1. Haz una lluvia de ideas de al menos 5 formas diferentes de evaluar las características de un retraso típico de un grupo de vuelos. Considera los siguientes escenarios:
+El retraso en la llegada es más importante: si salgo tarde pero llego a tiempo, está bien, pero por lo general me gusta adherirme a la fecha en que se supone que debe ser mi llegada.  Las características de retraso pueden variar, por ejemplo, retrasos grandes y pequeños, o pueden ser consistentes, por ejemplo, la cantidad típica de retraso. 
+
+- Un vuelo llega 15 minutos antes 50% del tiempo, y 15 minutos tarde 50% del tiempo.
+- Un vuelo llega siempre 10 minutos tarde.
+- Un vuelo llega 30 minutos antes 50% del tiempo, y 30 minutos tarde 50% del tiempo.
+- Un vuelo llega a tiempo en el 99% de los casos. 1% de las veces llega 2 horas tarde.
+
+
+¿Qué es más importante: retraso de la llegada o demora de salida?
+
+2. Sugiere un nuevo enfoque que te dé el mismo output que no_cancelados %>% count(destino) y no_cancelado %>% count(codigo_cola, wt = distancia) (sin usar count()).
+Generamos un nuevo df para los vuelos no cancelados.
+```{r}
+not_cancelled <- flights %>%
+  filter(!is.na(dep_delay), !is.na(arr_delay))
+```
+
+```{r}
+not_cancelled %>% 
+  count(dest)
+```
+La función count () cuenta el número de instancias dentro de cada valor la variable destino. Para obtener la misma salida, podríamos agrupar por destino y usar summarise() con n() para contar dentro de cada grupo o con la función length() que obtiene la longitud de un vector (lista) u otros objetos
+```{r}
+not_cancelled %>%
+  group_by(dest) %>%
+   summarise(n = length(dest))
+```
+
+```{r}
+not_cancelled %>%
+  group_by(dest) %>%
+   summarise(conteo=n())
+```
+Porbemos la segunda expresión, “contar” (sumar) el número total de millas que voló un avión:
+```{r}
+not_cancelled %>% 
+  count(tailnum, wt = distance)
+```
+Una alternativa a count(), es usando group_by() y summarise con sum para obtener el total de vuelos no cancelados por destinos. Podemos emplear group_by() y tally() es un contenedor conveniente para resumir, emplea a n() o sum(n) dependiendo de si está contando por primera vez o volviendo a contar. Por esta razón, también es posible emplear summarise con sum (). 
+```{r}
+not_cancelled %>%
+  group_by(tailnum) %>%
+tally(wt = distance)
+```
+```{r}
+not_cancelled %>%
+  group_by(tailnum) %>%
+summarise(sum(wt = distance))
+```
+
+3. Nuestra definición de vuelos cancelados (is.na(atraso_salida) | is.na (atraso_llegada)) es un poco subóptima. ¿Por qué? ¿Cuál es la columna más importante?
+Puede haber vuelos que salen pero nunca llegan, lo que podría significar un vuelo cancelado. Sin embargo, un vuelo que nunca sale nunca llegará. Diría que arr_delay sería más importante: si un vuelo llegó, partirá, pero no al revés. Para hacer una tabla de vuelos cancelados óptima, solo haría. Podemos ver que obtenemos la misma cantidad de vuelos cancelados. 
+
+```{r}
+flights %>% 
+  filter(is.na(arr_delay))
+```
+```{r}
+flights %>% 
+  filter(is.na(dep_delay) | is.na(arr_delay))
+```
+
+
+4. Mira la cantidad de vuelos cancelados por día. ¿Hay un patrón? ¿La proporción de vuelos cancelados está relacionada con el retraso promedio?
+A medida que aumenta el retraso en la salida de los vuelos, mayor es la proporción de los vuelos cancelados. 
+```{r}
+cancelled_delayed <- 
+  flights %>%
+  mutate(cancelled = (is.na(arr_delay) | is.na(dep_delay))) %>%
+  group_by(year, month, day) %>%
+  summarise(prop_cancelled = mean(cancelled),
+            avg_dep_delay = mean(dep_delay, na.rm = TRUE))
+
+ggplot(cancelled_delayed, aes(x = avg_dep_delay, prop_cancelled)) +
+  geom_point() +
+  geom_smooth()
+```
+
+5. ¿Qué compañía tiene los peores retrasos? Desafío: ¿puedes desenredar el efecto de malos aeropuertos vs. el efecto de malas aerolíneas? ¿Por qué o por qué no? (Sugerencia: piensa en vuelos %>% group_by(aerolinea, destino) %>% summarise(n()))
+Así que queremos agrupar por operador. Y como queremos tener en cuenta el aeropuerto (destino), podemos agrupar por destino y transportista.
+La compañía con los peores atrasos es Frontier Airlines Inc. 
+```{r}
+flights %>%
+  group_by(carrier) %>%
+  summarise(arr_delay = mean(arr_delay, na.rm = TRUE)) %>%
+  arrange(desc(arr_delay))
+```
+
+
+Las areorolíneas con mayor cantidad de vuelos retrasados son EV, B6, UA y DL. Los destinos con más vuelos retrasados son ATL y ORD.
+```{r}
+flights %>%
+  group_by(carrier) %>%
+  tally(arr_delay>0) %>%
+  arrange(desc(n))
+```
+
+```{r}
+flights %>%
+  group_by(dest) %>%
+  tally(arr_delay>0) %>%
+  arrange(desc(n))
+```
+Puede obtener parte del camino para desentrañar los efectos de los aeropuertos frente a los malos transportistas comparando el retraso promedio de cada transportista con el retraso promedio de los vuelos dentro de una ruta (vuelos desde el mismo origen al mismo destino). La comparación de los retrasos entre aerolineas y dentro de cada ruta desenreda el efecto de los transportistas y los aeropuertos. Un mejor análisis compararía el retraso promedio de los vuelos de una aerolínea con el retraso promedio de todos los vuelos de las demás aerolíneas dentro de una ruta.
+```{r}
+flights %>%
+  filter(!is.na(arr_delay)) %>%
+  # Total de atrasos por aerolineas dentro cada ruta
+  group_by(origin, dest, carrier) %>%
+  summarise(
+    arr_delay = sum(arr_delay),
+    flights = n()
+  ) %>%
+  # Total atraso en cada ruta
+  group_by(origin, dest) %>%
+  mutate(
+    arr_delay_total = sum(arr_delay),
+    flights_total = sum(flights)
+  ) %>%
+  # atraso promedio de cada aerolinea - atraso promedio de las otras aerolineas
+  mutate(
+    arr_delay_others = (arr_delay_total - arr_delay) /
+      (flights_total - flights),
+    arr_delay_mean = arr_delay / flights,
+    arr_delay_diff = arr_delay_mean - arr_delay_others
+  ) %>%
+  # remove NaN values (when there is only one carrier)
+  filter(is.finite(arr_delay_diff)) %>%
+  # average over all airports it flies to
+  group_by(carrier) %>%
+  summarise(arr_delay_diff = mean(arr_delay_diff)) %>%
+  arrange(desc(arr_delay_diff))
+```
+
+6. ¿Qué hace el argumento sort a count(). ¿Cuándo podrías usarlo?
+El argumento sort de count() ordena de mayor a menor conteo. Uno podría usar esto para ver el conteo más alto de algo entre los conteos de otros.
+```{r}
+not_cancelled %>% count(dest)
+```
+```{r}
+not_cancelled %>% count(dest,sort=T)
+```
+
+## Transformaciones agrupadas y filtros
+
+##### 5.7.1 Ejercicios
+
+1. Remítete a las listas de funciones útiles de mutación y filtrado. Describe cómo cambia cada operación cuando las combinas con la agrupación.
+Funciones de resumen ( mean()), funciones de compensación ( lead(), lag()), funciones de clasificación ( min_rank(),row_number()), operar dentro de cada grupo cuando se utiliza congroup_by()en mutate()o filter(). Operadores aritméticos ( +, -), operadores lógicos (<,==), operadores aritméticos modulares ( %%, %/%), funciones logarítmicas ( log) no se ven afectados por group_by.
+
+Las funciones de resumen como mean(), median(), sum()y std()otras cubiertas en la sección Funciones de resumen útiles calculan sus valores dentro de cada grupo cuando se usan con mutate()o filter()y group_by().
+
+2. ¿Qué avión ( tailnum) tiene el peor récord de puntualidad?
+Para medir la puntualidad, se tomo el atraso medio en la llegada y la proporción de vuelos que llegan a horario. 
+Sin embargo, hay muchos aviones que nunca han realizado un vuelo a tiempo. Además, muchos de los aviones que tienen la proporción más baja de vuelos a tiempo solo han realizado una pequeña cantidad de vuelos.
+```{r}
+flights %>%
+  filter(!is.na(tailnum)) %>%
+  mutate(on_time = !is.na(arr_time) & (arr_delay <= 0)) %>%
+  group_by(tailnum) %>%
+  summarise(on_time = mean(on_time), n = n()) %>%
+  filter(min_rank(on_time) == 1)
+```
+
+
